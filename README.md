@@ -13,6 +13,9 @@ AMD and NVIDIA gpus. This project exists for me to gain more experice with
 Vulkan to speed up and parallelize computational tasks, with applications
 specific to speeding up inference among llms, physics demos, or graphics 
 demos. One unique design feature I used for this project was using multithreading 
-to help parallelize computations on the CPU.
+to help parallelize computations on the CPU. As of right now, this implementation
+is slower for computations than single threading because of computaional overhead,
+but after I create speedups in Vulkan, the primality_test program should run
+a little faster.
 
 Thanks for reading and feel free to test this out!
