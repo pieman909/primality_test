@@ -1,0 +1,11 @@
+ESTIMATOR CLASS___
+g++ -O3 -march=native -std=c++17 prime_estimator.cpp -o prime_estimator -lmpfr -lgmp -pthread
+./prime_estimator 9 100000  # Estimate primes around 10^10^9 with 100,000 samples
+
+
+TESTER CLASS___
+g++ -O3 -march=native -std=c++17 primality_test.cpp -o primality_test -lgmp -pthread
+./primality_test 1 12345678901234567890  # Test a specific number
+./primality_test 2 1000                  # Generate and test a 1000-digit number
+./primality_test 3 9                     # Generate and test a number around 10^10^9
+./primality_test 4 9 10                  # Generate and test 10 numbers around 10^10^9
