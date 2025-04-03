@@ -1,8 +1,10 @@
 This repo contains the c++ files as well as their associated binaries and compilation instructions:
 prime_estimator.cpp
+  Responsible for generating potential prime numbers within a given range
 primality_test.cpp
+  Evaluates a given potential prime number for primality
 print.cpp
-
+  Internal tool for evaluating single-threaded and multi-threaded performance
 Along with these files there are precompiled binaries for each of them. 
 This is a work in progress and merely working skeleton code for a more 
 advanced/optimized approach using Vulkan to parallelize the Miller-Rabin 
