@@ -1,6 +1,6 @@
 This repo contains the c++ files as well as their associated binaries and compilation instructions:
 
-prime_estimator.cpp
+prime_estimator.cpp 
 
   Responsible for generating potential prime numbers within a given range
   
