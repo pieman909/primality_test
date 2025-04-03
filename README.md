@@ -12,7 +12,7 @@ print.cpp
 
   Internal tool for evaluating single-threaded and multi-threaded performance
 
-=============================================================================================
+==========================================================================================
 
 Along with these files there are precompiled binaries for each of them. 
 This is a work in progress and merely working skeleton code for a more 
