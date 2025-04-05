@@ -126,6 +126,9 @@ private:
     mpz_t j;           // For exponentiation
     mpz_t two;         // Constant 2
 
+    bool gpu_available;
+    hipDevice_t gpu_device;
+
     // Helper function to find factor s where n-1 = 2^s * d
     uint64_t find_s_d(mpz_t d) {
         uint64_t s = 0;
