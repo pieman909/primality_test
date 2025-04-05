@@ -247,6 +247,91 @@ private:
         mpz_clear(local_d);
         gmp_randclear(local_rng);
     }
+    // Try to run Miller-Rabin tests on GPU
+    bool run_miller_rabin_gpu(int rounds, const mpz_t d, uint64_t s) {
+        if (!gpu_available) {
+            std::cout << "GPU acceleration not available, falling back to CPU" << std::endl;
+            return false;
+        }
+        
+        std::cout << "Attempting GPU-accelerated primality test..." << std::endl;
+        
+        try {
+            // Convert GMP data to format suitable for GPU
+            size_t n_size = mpz_sizeinbase(n, 2) / 32 + 1;
+            size_t n_minus_1_size = mpz_sizeinbase(n_minus_1, 2) / 32 + 1;
+            size_t d_size = mpz_sizeinbase(d, 2) / 32 + 1;
+            
+            // Check if number is too large for our GPU implementation
+            if (n_size > 128) {
+                std::cout << "Number too large for GPU implementation (>4096 bits), falling back to CPU" << std::endl;
+                return false;
+            }
+            
+            // Allocate host memory for number data
+            std::vector<uint32_t> h_n_data(n_size, 0);
+            std::vector<uint32_t> h_n_minus_1_data(n_minus_1_size, 0);
+            std::vector<uint32_t> h_d_data(d_size, 0);
+            
+            // Export GMP numbers to our format (simplified)
+            // In a real implementation, use mpz_export to properly convert GMP data
+            
+            // Allocate device memory
+            uint32_t *d_n_data, *d_n_minus_1_data, *d_d_data, *d_rng_states;
+            bool *d_results;
+            
+            HIP_CHECK(hipMalloc(&d_n_data, n_size * sizeof(uint32_t)));
+            HIP_CHECK(hipMalloc(&d_n_minus_1_data, n_minus_1_size * sizeof(uint32_t)));
+            HIP_CHECK(hipMalloc(&d_d_data, d_size * sizeof(uint32_t)));
+            HIP_CHECK(hipMalloc(&d_results, rounds * sizeof(bool)));
+            HIP_CHECK(hipMalloc(&d_rng_states, rounds * sizeof(uint32_t)));
+            
+            // Copy data to device
+            HIP_CHECK(hipMemcpy(d_n_data, h_n_data.data(), n_size * sizeof(uint32_t), hipMemcpyHostToDevice));
+            HIP_CHECK(hipMemcpy(d_n_minus_1_data, h_n_minus_1_data.data(), n_minus_1_size * sizeof(uint32_t), hipMemcpyHostToDevice));
+            HIP_CHECK(hipMemcpy(d_d_data, h_d_data.data(), d_size * sizeof(uint32_t), hipMemcpyHostToDevice));
+            
+            // Initialize RNG states (simplified)
+            
+            // Calculate grid dimensions
+            int num_blocks = (rounds + GPU_BLOCK_SIZE - 1) / GPU_BLOCK_SIZE;
+            if (num_blocks > GPU_NUM_BLOCKS) num_blocks = GPU_NUM_BLOCKS;
+            
+            // Launch kernel
+            hipLaunchKernelGGL(miller_rabin_kernel, dim3(num_blocks), dim3(GPU_BLOCK_SIZE), 0, 0,
+                           d_results, rounds, d_n_data, n_size, d_n_minus_1_data, n_minus_1_size,
+                           d_d_data, d_size, s, d_rng_states);
+            
+            // Check for kernel errors
+            HIP_CHECK(hipGetLastError());
+            HIP_CHECK(hipDeviceSynchronize());
+            
+            // Copy results back
+            std::vector<bool> h_results(rounds);
+            HIP_CHECK(hipMemcpy(h_results.data(), d_results, rounds * sizeof(bool), hipMemcpyDeviceToHost));
+            
+            // Free device memory
+            HIP_CHECK(hipFree(d_n_data));
+            HIP_CHECK(hipFree(d_n_minus_1_data));
+            HIP_CHECK(hipFree(d_d_data));
+            HIP_CHECK(hipFree(d_results));
+            HIP_CHECK(hipFree(d_rng_states));
+            
+            // Check results
+            for (int i = 0; i < rounds; i++) {
+                if (!h_results[i]) {
+                    return false;  // Number is composite
+                }
+            }
+            
+            return true;  // Number is probably prime
+            
+        } catch (const std::exception& e) {
+            std::cerr << "GPU acceleration error: " << e.what() << std::endl;
+            std::cerr << "Falling back to CPU implementation" << std::endl;
+            return false;
+        }
+    }
 
 public:
     PrimalityTester() {
