@@ -8,6 +8,7 @@
 #include <chrono>
 #include <gmp.h>
 #include <iomanip>
+#include <hip/hip_runtime.h>
 
 // Number of threads to use
 const int NUM_THREADS = std::thread::hardware_concurrency();
