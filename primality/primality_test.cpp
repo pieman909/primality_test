@@ -22,6 +22,98 @@ std::atomic<bool> is_composite{false};
 std::atomic<uint64_t> progress_counter{0};
 std::atomic<uint64_t> total_tasks{0};
 
+// Error checking macro for HIP
+#define HIP_CHECK(cmd) \
+    do { \
+        hipError_t error = cmd; \
+        if (error != hipSuccess) { \
+            std::cerr << "HIP error: " << hipGetErrorString(error) << " at " \
+                    << __FILE__ << ":" << __LINE__ << std::endl; \
+            exit(EXIT_FAILURE); \
+        } \
+    } while(0)
+
+// Simple implementation of large integer arithmetic for the GPU
+struct GpuInt {
+    uint32_t digits[128];  // 4096-bit integer representation
+    int num_digits;
+
+    __device__ void set(uint32_t val) {
+        for (int i = 0; i < 128; i++) {
+            digits[i] = 0;
+        }
+        digits[0] = val;
+        num_digits = 1;
+    }
+
+    __device__ bool is_zero() const {
+        for (int i = 0; i < num_digits; i++) {
+            if (digits[i] != 0) return false;
+        }
+        return true;
+    }
+
+    __device__ bool is_one() const {
+        if (digits[0] != 1) return false;
+        for (int i = 1; i < num_digits; i++) {
+            if (digits[i] != 0) return false;
+        }
+        return true;
+    }
+
+    __device__ int compare(const GpuInt& other) const {
+        if (num_digits > other.num_digits) return 1;
+        if (num_digits < other.num_digits) return -1;
+        
+        for (int i = num_digits - 1; i >= 0; i--) {
+            if (digits[i] > other.digits[i]) return 1;
+            if (digits[i] < other.digits[i]) return -1;
+        }
+        return 0;
+    }
+
+    // Basic modular exponentiation for GPU
+    __device__ void pow_mod(const GpuInt& base, const GpuInt& exp, const GpuInt& mod) {
+        GpuInt result;
+        result.set(1);
+        GpuInt temp = base;
+        
+        for (int i = 0; i < exp.num_digits; i++) {
+            uint32_t e = exp.digits[i];
+            for (int bit = 0; bit < 32; bit++) {
+                if (e & (1 << bit)) {
+                    // result = (result * temp) % mod
+                    // Simplified for illustration
+                }
+                // temp = (temp * temp) % mod
+                // Simplified for illustration
+            }
+        }
+        *this = result;
+    }
+};
+
+// GPU kernel for Miller-Rabin primality test
+__global__ void miller_rabin_kernel(bool* results, int rounds, const uint32_t* n_data, int n_size,
+                                    const uint32_t* n_minus_1_data, int n_minus_1_size,
+                                    const uint32_t* d_data, int d_size, uint64_t s,
+                                    uint32_t* rng_states) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= rounds) return;
+    
+    // This is a simplified placeholder - implementing a full Miller-Rabin test
+    // with large integer arithmetic on GPU is beyond the scope of this example
+    // In a real implementation, you would:
+    // 1. Convert GMP data to GpuInt format
+    // 2. Generate random base a (2 <= a <= n-2)
+    // 3. Compute a^d % n
+    // 4. Perform Miller-Rabin test steps
+    // 5. Store result in results[idx]
+    
+    // Placeholder result - always consider number composite to force CPU fallback
+    results[idx] = false;
+}
+
 // Class for primality testing of extremely large numbers
 class PrimalityTester {
 private:
