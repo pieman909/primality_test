@@ -8,7 +8,6 @@
 #include <chrono>
 #include <gmp.h>
 #include <iomanip>
-#include <hip/hip_runtime.h>
 
 // Number of threads to use
 const int NUM_THREADS = std::thread::hardware_concurrency();
@@ -22,98 +21,6 @@ std::atomic<bool> is_composite{false};
 std::atomic<uint64_t> progress_counter{0};
 std::atomic<uint64_t> total_tasks{0};
 
-// Error checking macro for HIP
-#define HIP_CHECK(cmd) \
-    do { \
-        hipError_t error = cmd; \
-        if (error != hipSuccess) { \
-            std::cerr << "HIP error: " << hipGetErrorString(error) << " at " \
-                    << __FILE__ << ":" << __LINE__ << std::endl; \
-            exit(EXIT_FAILURE); \
-        } \
-    } while(0)
-
-// Simple implementation of large integer arithmetic for the GPU
-struct GpuInt {
-    uint32_t digits[128];  // 4096-bit integer representation
-    int num_digits;
-
-    __device__ void set(uint32_t val) {
-        for (int i = 0; i < 128; i++) {
-            digits[i] = 0;
-        }
-        digits[0] = val;
-        num_digits = 1;
-    }
-
-    __device__ bool is_zero() const {
-        for (int i = 0; i < num_digits; i++) {
-            if (digits[i] != 0) return false;
-        }
-        return true;
-    }
-
-    __device__ bool is_one() const {
-        if (digits[0] != 1) return false;
-        for (int i = 1; i < num_digits; i++) {
-            if (digits[i] != 0) return false;
-        }
-        return true;
-    }
-
-    __device__ int compare(const GpuInt& other) const {
-        if (num_digits > other.num_digits) return 1;
-        if (num_digits < other.num_digits) return -1;
-        
-        for (int i = num_digits - 1; i >= 0; i--) {
-            if (digits[i] > other.digits[i]) return 1;
-            if (digits[i] < other.digits[i]) return -1;
-        }
-        return 0;
-    }
-
-    // Basic modular exponentiation for GPU
-    __device__ void pow_mod(const GpuInt& base, const GpuInt& exp, const GpuInt& mod) {
-        GpuInt result;
-        result.set(1);
-        GpuInt temp = base;
-        
-        for (int i = 0; i < exp.num_digits; i++) {
-            uint32_t e = exp.digits[i];
-            for (int bit = 0; bit < 32; bit++) {
-                if (e & (1 << bit)) {
-                    // result = (result * temp) % mod
-                    // Simplified for illustration
-                }
-                // temp = (temp * temp) % mod
-                // Simplified for illustration
-            }
-        }
-        *this = result;
-    }
-};
-
-// GPU kernel for Miller-Rabin primality test
-__global__ void miller_rabin_kernel(bool* results, int rounds, const uint32_t* n_data, int n_size,
-                                    const uint32_t* n_minus_1_data, int n_minus_1_size,
-                                    const uint32_t* d_data, int d_size, uint64_t s,
-                                    uint32_t* rng_states) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= rounds) return;
-    
-    // This is a simplified placeholder - implementing a full Miller-Rabin test
-    // with large integer arithmetic on GPU is beyond the scope of this example
-    // In a real implementation, you would:
-    // 1. Convert GMP data to GpuInt format
-    // 2. Generate random base a (2 <= a <= n-2)
-    // 3. Compute a^d % n
-    // 4. Perform Miller-Rabin test steps
-    // 5. Store result in results[idx]
-    
-    // Placeholder result - always consider number composite to force CPU fallback
-    results[idx] = false;
-}
-
 // Class for primality testing of extremely large numbers
 class PrimalityTester {
 private:
@@ -125,9 +32,6 @@ private:
     mpz_t r;           // For division
     mpz_t j;           // For exponentiation
     mpz_t two;         // Constant 2
-
-    bool gpu_available;
-    hipDevice_t gpu_device;
 
     // Helper function to find factor s where n-1 = 2^s * d
     uint64_t find_s_d(mpz_t d) {
@@ -246,91 +150,6 @@ private:
         mpz_clear(local_n_minus_1);
         mpz_clear(local_d);
         gmp_randclear(local_rng);
-    }
-    // Try to run Miller-Rabin tests on GPU
-    bool run_miller_rabin_gpu(int rounds, const mpz_t d, uint64_t s) {
-        if (!gpu_available) {
-            std::cout << "GPU acceleration not available, falling back to CPU" << std::endl;
-            return false;
-        }
-        
-        std::cout << "Attempting GPU-accelerated primality test..." << std::endl;
-        
-        try {
-            // Convert GMP data to format suitable for GPU
-            size_t n_size = mpz_sizeinbase(n, 2) / 32 + 1;
-            size_t n_minus_1_size = mpz_sizeinbase(n_minus_1, 2) / 32 + 1;
-            size_t d_size = mpz_sizeinbase(d, 2) / 32 + 1;
-            
-            // Check if number is too large for our GPU implementation
-            if (n_size > 128) {
-                std::cout << "Number too large for GPU implementation (>4096 bits), falling back to CPU" << std::endl;
-                return false;
-            }
-            
-            // Allocate host memory for number data
-            std::vector<uint32_t> h_n_data(n_size, 0);
-            std::vector<uint32_t> h_n_minus_1_data(n_minus_1_size, 0);
-            std::vector<uint32_t> h_d_data(d_size, 0);
-            
-            // Export GMP numbers to our format (simplified)
-            // In a real implementation, use mpz_export to properly convert GMP data
-            
-            // Allocate device memory
-            uint32_t *d_n_data, *d_n_minus_1_data, *d_d_data, *d_rng_states;
-            bool *d_results;
-            
-            HIP_CHECK(hipMalloc(&d_n_data, n_size * sizeof(uint32_t)));
-            HIP_CHECK(hipMalloc(&d_n_minus_1_data, n_minus_1_size * sizeof(uint32_t)));
-            HIP_CHECK(hipMalloc(&d_d_data, d_size * sizeof(uint32_t)));
-            HIP_CHECK(hipMalloc(&d_results, rounds * sizeof(bool)));
-            HIP_CHECK(hipMalloc(&d_rng_states, rounds * sizeof(uint32_t)));
-            
-            // Copy data to device
-            HIP_CHECK(hipMemcpy(d_n_data, h_n_data.data(), n_size * sizeof(uint32_t), hipMemcpyHostToDevice));
-            HIP_CHECK(hipMemcpy(d_n_minus_1_data, h_n_minus_1_data.data(), n_minus_1_size * sizeof(uint32_t), hipMemcpyHostToDevice));
-            HIP_CHECK(hipMemcpy(d_d_data, h_d_data.data(), d_size * sizeof(uint32_t), hipMemcpyHostToDevice));
-            
-            // Initialize RNG states (simplified)
-            
-            // Calculate grid dimensions
-            int num_blocks = (rounds + GPU_BLOCK_SIZE - 1) / GPU_BLOCK_SIZE;
-            if (num_blocks > GPU_NUM_BLOCKS) num_blocks = GPU_NUM_BLOCKS;
-            
-            // Launch kernel
-            hipLaunchKernelGGL(miller_rabin_kernel, dim3(num_blocks), dim3(GPU_BLOCK_SIZE), 0, 0,
-                           d_results, rounds, d_n_data, n_size, d_n_minus_1_data, n_minus_1_size,
-                           d_d_data, d_size, s, d_rng_states);
-            
-            // Check for kernel errors
-            HIP_CHECK(hipGetLastError());
-            HIP_CHECK(hipDeviceSynchronize());
-            
-            // Copy results back
-            std::vector<bool> h_results(rounds);
-            HIP_CHECK(hipMemcpy(h_results.data(), d_results, rounds * sizeof(bool), hipMemcpyDeviceToHost));
-            
-            // Free device memory
-            HIP_CHECK(hipFree(d_n_data));
-            HIP_CHECK(hipFree(d_n_minus_1_data));
-            HIP_CHECK(hipFree(d_d_data));
-            HIP_CHECK(hipFree(d_results));
-            HIP_CHECK(hipFree(d_rng_states));
-            
-            // Check results
-            for (int i = 0; i < rounds; i++) {
-                if (!h_results[i]) {
-                    return false;  // Number is composite
-                }
-            }
-            
-            return true;  // Number is probably prime
-            
-        } catch (const std::exception& e) {
-            std::cerr << "GPU acceleration error: " << e.what() << std::endl;
-            std::cerr << "Falling back to CPU implementation" << std::endl;
-            return false;
-        }
     }
 
 public:
