@@ -9,10 +9,8 @@
 #include <gmp.h>
 #include <iomanip>
 
-// Number of threads to use
 const int NUM_THREADS = std::thread::hardware_concurrency();
 
-// Number of Miller-Rabin rounds for 128-bit security
 constexpr int MR_ROUNDS = 64;
 
 // Thread synchronization
