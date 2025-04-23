@@ -29,7 +29,6 @@ private:
     mpz_t j;           // For exponentiation
     mpz_t two;         // Constant 2
 
-    // Helper function to find factor s where n-1 = 2^s * d
     uint64_t find_s_d(mpz_t d) {
         uint64_t s = 0;
         mpz_set(d, n_minus_1);
@@ -42,16 +41,13 @@ private:
         return s;
     }
 
-    // Single Miller-Rabin test with base a
     bool miller_rabin_single_test(const mpz_t a, const mpz_t d, uint64_t s) {
         mpz_t y, tmp;
         mpz_init(y);
         mpz_init(tmp);
 
-        // Compute a^d mod n
         mpz_powm(y, a, d, n);
 
-        // If a^d ≡ 1 (mod n) or a^d ≡ -1 (mod n), n is probably prime
         if (mpz_cmp_ui(y, 1) == 0 || mpz_cmp(y, n_minus_1) == 0) {
             mpz_clear(y);
             mpz_clear(tmp);
