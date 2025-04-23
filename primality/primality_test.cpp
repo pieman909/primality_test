@@ -13,13 +13,11 @@ const int NUM_THREADS = std::thread::hardware_concurrency();
 
 constexpr int MR_ROUNDS = 64;
 
-// Thread synchronization
 std::mutex mtx;
 std::atomic<bool> is_composite{false};
 std::atomic<uint64_t> progress_counter{0};
 std::atomic<uint64_t> total_tasks{0};
 
-// Class for primality testing of extremely large numbers
 class PrimalityTester {
 private:
     gmp_randstate_t rng;
