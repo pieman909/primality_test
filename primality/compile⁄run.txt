@@ -11,3 +11,4 @@ g++ -O3 -march=native -std=c++17 primality_test.cpp -o primality_test -lgmp -pth
 ./primality_test 2 1000                  # Generate and test a 1000-digit number
 ./primality_test 3 9                     # Generate and test a number around 10^10^9
 ./primality_test 4 9 10                  # Generate and test 10 numbers around 10^10^9
+./primality_test 5 3 12                  # Generate and test 12 numbers around 10^10^3
